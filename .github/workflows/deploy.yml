@@ -2,38 +2,48 @@ name: Backend CI/CD to AWS EC2
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      # 1️⃣ Checkout source code
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-java@v3
+      # 2️⃣ Setup Java 17
+      - name: Setup Java 17
+        uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build
+      # 3️⃣ Build Spring Boot JAR
+      - name: Build with Maven
         run: mvn clean package -DskipTests
 
-      - name: Copy JAR
+      # 4️⃣ Copy JAR to AWS EC2
+      - name: Copy JAR to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
+          username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           source: "target/*.jar"
           target: "/home/ec2-user/app/app.jar"
 
-      - name: Restart App
+      # 5️⃣ Restart Spring Boot App (SAFE & NON-BLOCKING)
+      - name: Restart Application on EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
+          username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
             pkill -f app.jar || true
-            nohup java -jar /home/ec2-user/app/app.jar --spring.profiles.active=prod > log.txt 2>&1 &
+            cd /home/ec2-user/app
+            nohup java -jar app.jar --spring.profiles.active=prod > log.txt 2>&1 </dev/null &
+            exit 0
