@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout source code
-      - name: Checkout code
+      # 1️⃣ Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       # 2️⃣ Setup Java 17
@@ -25,7 +25,7 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
-      # 4️⃣ Copy JAR to AWS EC2
+      # 4️⃣ Copy JAR to EC2 (overwrite old jar)
       - name: Copy JAR to EC2
         uses: appleboy/scp-action@master
         with:
@@ -35,15 +35,13 @@ jobs:
           source: "target/*.jar"
           target: "/home/ec2-user/app/app.jar"
 
-      # 5️⃣ Restart Spring Boot App (FIXED – NO EXIT 143)
-      - name: Restart Application on EC2
+      # 5️⃣ Restart systemd service (FAST & SAFE)
+      - name: Restart backend service
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          command_timeout: 10m
           script: |
-            pkill -f app.jar || true
-            cd /home/ec2-user/app
-            setsid nohup java -jar app.jar --spring.profiles.active=prod > log.txt 2>&1 < /dev/null &
+            sudo systemctl daemon-reload
+            sudo systemctl restart employee-backend
